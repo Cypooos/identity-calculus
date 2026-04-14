@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use clap::{Parser, Subcommand};
 
 use search::dag::MultiDag;
-use search::dot::{to_dot, DotOptions};
+use search::dot::to_dot;
 use search::motifs::find_diamond3;
 use search::tree::Tree;
 
@@ -68,13 +68,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("level_sizes: {:?}", dag.level_sizes());
 
             if let Some(path) = dot {
-                let dot_str = to_dot(
-                    &dag,
-                    DotOptions {
-                        show_node_labels: labels,
-                        show_edge_multiplicity: dot_multiplicity,
-                    },
-                );
+                let dot_str = to_dot(&dag, dot_multiplicity);
                 std::fs::write(path, dot_str)?;
             }
         }

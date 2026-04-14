@@ -1,5 +1,5 @@
 {
-  description = "Typst";
+  description = "Rust";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -16,7 +16,9 @@
 
         devShells.default = pkgs.mkShell {
           packages = [
-            pkgs.typst
+            pkgs.cargo
+            pkgs.rustc
+            pkgs.rust.packages.stable.rustPlatform.rustcSrc
           ];
         };
       });

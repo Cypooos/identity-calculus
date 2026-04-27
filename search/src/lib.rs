@@ -3,10 +3,12 @@
 
 pub mod dag;
 pub mod dot;
-pub mod motifs;
+// pub mod motifs;
 pub mod parse;
 pub mod reduction;
 pub mod tree;
+pub mod reconstruct;
+pub mod enumerate;
 
 pub use dag::{MultiDag, NodeId};
 pub use parse::TreeParseError;

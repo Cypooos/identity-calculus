@@ -2,10 +2,14 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 
+use itertools::Itertools;
 use search::dag::MultiDag;
 use search::dot::to_dot;
-use search::motifs::find_diamond3;
+use search::enumerate::{catalan, get_hook_length, get_nb_reductions, get_trees};
+use search::parse::parse_tree;
 use search::tree::Tree;
+
+use search::reconstruct::{get_spine, reconstruct};
 
 #[derive(Parser, Debug)]
 #[command(name = "search")]
@@ -33,20 +37,42 @@ enum Command {
 
         /// Affiche les multiplicités sur les arêtes DOT (si > 1).
         #[arg(long)]
-        dot_multiplicity: bool,
+        multi: bool,
+
+        /// Color the spine
+        #[arg(long)]
+        spine: bool,
+
+        /// Run the algorithm
+        #[arg(long)]
+        algo: bool,
     },
 
-    /// Énumère tous les arbres ayant N arêtes.
+    /// Énumère le nombre de réduction d'un arbre. Si on donne un nombre, fait tout les arbres à n arretes
     Enumerate {
         #[arg(long)]
-        edges: usize,
+        tree: String,
+        #[arg(long)]
+        multi: bool,
     },
 
-    /// Cherche un motif "diamond3" sur des arbres jusqu'à N arêtes.
-    SearchDiamond3 {
+    /// Teste si deux dag sont égaux.
+    Equality {
         #[arg(long)]
-        max_edges: usize,
+        tree1: String,
+        #[arg(long)]
+        tree2: String,
+        #[arg(long)]
+        multi: bool,
     },
+
+    /// Currently, search for all pairs if trees of nodes <= nb_nodes if dag equality <=> canonical 
+    SearchEquality {
+        #[arg(long)]
+        n:usize,
+        #[arg(long)]
+        multi: bool,
+    }
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -55,45 +81,91 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     match cli.command {
         Command::Dag {
             tree,
-            labels,
+            labels:_,
             dot,
-            dot_multiplicity,
+            multi,
+            spine,
+            algo,
         } => {
             let tree: Tree = tree.parse()?;
-            let dag = MultiDag::from_tree(&tree, labels);
+            let dag = MultiDag::<Tree>::from_tree(&tree);
 
             println!("nodes: {}", dag.node_count());
-            println!("distinct_edges: {}", dag.distinct_edge_count());
-            println!("total_multiplicity: {}", dag.total_multiplicity());
-            println!("level_sizes: {:?}", dag.level_sizes());
-
+            println!("distinct_edges: {}", dag.edges_count_single());
+            println!("total_multiplicity: {}", dag.edges_count());
+            println!("finals: {:?}", dag.get_finals().iter().map(|x|format!("{}",dag.nodes.get(*x).unwrap().label)).collect::<Vec<String>>());
+            
             if let Some(path) = dot {
-                let dot_str = to_dot(&dag, dot_multiplicity);
+                let dot_str = if algo {
+                    to_dot(&reconstruct(&dag), multi)
+                } else if spine {
+                    let spine = get_spine(&dag);
+                    to_dot(&dag.tag_vec(&spine), multi)
+                } else {
+                    to_dot(&dag,multi)
+                };
                 std::fs::write(path, dot_str)?;
             }
         }
-        Command::Enumerate { edges } => {
-            let trees = Tree::enumerate_canonical_by_edges(edges);
-            eprintln!("count: {}", trees.len());
-            for t in trees {
-                println!("{t}");
-            }
-        }
-        Command::SearchDiamond3 { max_edges } => {
-            for edges in 0..=max_edges {
-                let trees = Tree::enumerate_canonical_by_edges(edges);
-                for t in trees {
-                    let tree: Tree = t.parse()?;
-                    if let Some(w) = find_diamond3(&tree) {
-                        println!("found: true");
-                        println!("top: {}", w.top);
-                        println!("middle: {:?}", w.middle);
-                        println!("bottom: {}", w.bottom);
-                        return Ok(());
+        Command::Enumerate { tree, multi } => {
+            match parse_tree(&tree) {
+                Err(x) => println!("{x}"),
+                Ok(tree) => {
+                    let width = 2*tree.edge_count()+2;
+                    let hook = get_hook_length(&tree);
+                    println!("Table for {tree} with {} edges.",tree.edge_count());
+                    let tree_to_nb = get_nb_reductions(tree, multi);
+                    let v = tree_to_nb.iter().sorted_by(|x,y| Ord::cmp(&x.0.edge_count(),&y.0.edge_count()));
+                    for (k,v) in v {
+                        println!("[{0:>3}] tree {1:>width$}: {v:>5} reductions. ({hook:?})", k.edge_count(), format!("{}",k));
                     }
+                    
                 }
             }
-            println!("found: false");
+        }
+
+        Command::Equality { tree1, tree2, multi  } => {
+            match (parse_tree(&tree1), parse_tree(&tree2)) {
+                (Err(x),_) | (_, Err(x)) => println!("{x}"),
+                (Ok(tree1), Ok(tree2)) => {
+                    let mut dag1 = MultiDag::<Tree>::from_tree(&tree1);
+                    let mut dag2 = MultiDag::<Tree>::from_tree(&tree2);
+                    if multi {
+                        println!("{tree1} is {}equal to {tree2}", if dag1 == dag2 {""} else {"not "});
+                    } else {
+                        dag1.remove_multiedges();
+                        dag2.remove_multiedges();
+                        println!("{tree1} is {}equal to {tree2}", if dag1 == dag2 {""} else {"not "});
+                    }
+                    
+                }
+            }
+        }
+
+        Command::SearchEquality{n,multi} => {
+            let nb = catalan(n+1)*catalan(n+1);
+            let mut i = 0;
+            get_trees(n+1).iter_mut().for_each(|t1| {
+                get_trees(n+1).iter_mut().for_each(|t2| {
+                    i+=1;
+                    if i % 10000 == 0 {println!("Done {i}/{nb}.")};
+                    if t1 < t2 {return;}
+                    let mut d1 = MultiDag::from_tree(&t1);
+                    let mut d2 = MultiDag::from_tree(&t2);
+                    if multi {
+                        d1.remove_multiedges();
+                        d2.remove_multiedges();
+                    }
+                    let s1 = format!("{t1}");
+                    let s2 = format!("{t1}");
+                    t1.to_canonical();
+                    t2.to_canonical();
+                    if (d1==d2) != (t1==t2) {
+                        println!("[ALERT] for {s1} & {s2}: {} and {} with cano={t1}",d1==d2,t1==t2);
+                    }
+                });
+            });
+            println!("DONE ({i}/{nb}).")
         }
     }
 

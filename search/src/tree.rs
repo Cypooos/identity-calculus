@@ -2,8 +2,9 @@ use std::fmt;
 
 use thiserror::Error;
 
+
 /// Arbre enraciné non étiqueté, avec enfants ordonnés.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Tree {
     pub children: Vec<Tree>,
 }
@@ -19,22 +20,22 @@ pub enum TreeEditError {
 }
 
 impl Tree {
-    /// Crée une feuille `()`.
+    /// Create a leaf ()
     pub fn leaf() -> Self {
         Self { children: vec![] }
     }
 
-    /// Retourne `true` si le nœud est une feuille.
+    /// Return if the tree is a leaf
     pub fn is_leaf(&self) -> bool {
         self.children.is_empty()
     }
 
-    /// Nombre de nœuds.
+    /// Number of nodes
     pub fn node_count(&self) -> usize {
         1 + self.children.iter().map(|c| c.node_count()).sum::<usize>()
     }
 
-    /// Nombre d'arêtes.
+    /// Numbre of edges
     pub fn edge_count(&self) -> usize {
         self.children.len() + self.children.iter().map(|c| c.edge_count()).sum::<usize>()
     }
@@ -97,16 +98,23 @@ impl Tree {
         self.children[first].delete_leaf_in_place(rest, depth + 1)
     }
 
-    /// Énumère (sous forme canonique) tous les arbres ayant exactement `edge_count` arêtes.
-    ///
-    /// Attention : le nombre croît comme les nombres de Catalan.
-    pub fn enumerate_canonical_by_edges(edge_count: usize) -> Vec<String> {
-        let inner = dyck_words(edge_count);
-        let mut out: Vec<String> = inner.into_iter().map(|w| format!("({w})")).collect();
-        out.sort();
-        out
+    pub fn for_each<T:FnMut(&Tree) -> ()>(&self, f :&mut T) {
+        f(self);
+        self.children.iter().for_each(|x|x.for_each(f));
     }
+
+    pub fn for_each_strict<T:FnMut(&Tree) -> ()>(&self, f :&mut T) {
+        self.children.iter().for_each(|x|x.for_each(f));
+    }
+
+    pub fn to_canonical(&mut self) {
+        self.children.iter_mut().for_each(|x|x.to_canonical());
+        self.children.sort();
+    }
+    // ( () (()) )      A AI AAII I 
+
 }
+
 
 impl fmt::Display for Tree {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -151,41 +159,4 @@ mod tests {
         assert_eq!(t.delete_leaf(&paths[1]).unwrap().to_string(), "(())");
     }
 
-    #[test]
-    fn enumerate_by_edges_matches_small_counts() {
-        assert_eq!(Tree::enumerate_canonical_by_edges(0), vec!["()"]);
-        assert_eq!(Tree::enumerate_canonical_by_edges(1), vec!["(())"]);
-        let e2 = Tree::enumerate_canonical_by_edges(2);
-        assert_eq!(e2, vec!["((()))", "(()())"]);
-    }
-}
-
-fn dyck_words(pairs: usize) -> Vec<String> {
-    fn generate(
-        pairs: usize,
-        memo: &mut std::collections::HashMap<usize, Vec<String>>,
-    ) -> Vec<String> {
-        if let Some(v) = memo.get(&pairs) {
-            return v.clone();
-        }
-        let out = if pairs == 0 {
-            vec![String::new()]
-        } else {
-            let mut out = Vec::new();
-            for k in 0..pairs {
-                let left = generate(k, memo);
-                let right = generate(pairs - 1 - k, memo);
-                for l in &left {
-                    for r in &right {
-                        out.push(format!("({l}){r}"));
-                    }
-                }
-            }
-            out
-        };
-        memo.insert(pairs, out.clone());
-        out
-    }
-
-    generate(pairs, &mut std::collections::HashMap::new())
 }

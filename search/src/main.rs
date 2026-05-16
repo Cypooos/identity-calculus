@@ -5,7 +5,7 @@ use clap::{Parser, Subcommand};
 use itertools::Itertools;
 use search::dag::MultiDag;
 use search::dot::to_dot;
-use search::enumerate::{catalan, get_hook_length, get_nb_reductions, get_trees};
+use search::enumerate::{catalan, get_hook_length, get_nb_reductions, get_random_tree, get_trees};
 use search::parse::parse_tree;
 use search::tree::Tree;
 
@@ -87,13 +87,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             spine,
             algo,
         } => {
-            let tree: Tree = tree.parse()?;
+            let tree: Tree = tree.parse().unwrap_or_else(|_| {
+                let mut rng = rand::rng();
+                println!("[WARNING] Incorrect input, taking a random same-length tree");
+                get_random_tree(&mut rng, tree.len()/2)
+            });
             let dag = MultiDag::<Tree>::from_tree(&tree);
 
-            println!("nodes: {}", dag.node_count());
-            println!("distinct_edges: {}", dag.edges_count_single());
+            println!("tree              : {}", tree);
+            println!("nodes             : {}", dag.node_count());
+            println!("distinct_edges    : {}", dag.edges_count_single());
             println!("total_multiplicity: {}", dag.edges_count());
-            println!("finals: {:?}", dag.get_finals().iter().map(|x|format!("{}",dag.nodes.get(*x).unwrap().label)).collect::<Vec<String>>());
+            println!("height            : {}", dag.height());
+            println!("finals            : {:?}", dag.get_finals().iter().map(|x|format!("{}",dag.nodes.get(*x).unwrap().label)).collect::<Vec<String>>());
             
             if let Some(path) = dot {
                 let dot_str = if algo {
@@ -108,30 +114,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
         Command::Enumerate { tree, multi } => {
-            match parse_tree(&tree) {
-                Err(x) => println!("{x}"),
-                Ok(tree) => {
-                    let width = 2*tree.edge_count()+2;
-                    let hook = get_hook_length(&tree);
-                    println!("Table for {tree} with {} edges.",tree.edge_count());
-                    let tree_to_nb = get_nb_reductions(tree, multi);
-                    let v = tree_to_nb.iter().sorted_by(|x,y| Ord::cmp(&x.0.edge_count(),&y.0.edge_count()));
-                    for (k,v) in v {
-                        println!("[{0:>3}] tree {1:>width$}: {v:>5} reductions. ({hook:?})", k.edge_count(), format!("{}",k));
-                    }
-                    
-                }
+            let tree = parse_tree(&tree)?;
+
+            let width = 2*tree.edge_count()+2;
+            let hook = get_hook_length(&tree);
+            println!("Table for {tree} with {} edges.",tree.edge_count());
+            let tree_to_nb = get_nb_reductions(tree, multi);
+            let v = tree_to_nb.iter().sorted_by(|x,y| Ord::cmp(&x.0.edge_count(),&y.0.edge_count()));
+            for (k,v) in v {
+                println!("[{0:>3}] tree {1:>width$}: {v:>5} reductions. ({hook:?})", k.edge_count(), format!("{}",k));
             }
         }
 
         Command::Equality { tree1, tree2, multi  } => {
             match (parse_tree(&tree1), parse_tree(&tree2)) {
                 (Err(x),_) | (_, Err(x)) => println!("{x}"),
-                (Ok(tree1), Ok(tree2)) => {
+                (Ok(mut tree1), Ok(mut tree2)) => {
                     let mut dag1 = MultiDag::<Tree>::from_tree(&tree1);
                     let mut dag2 = MultiDag::<Tree>::from_tree(&tree2);
                     if multi {
-                        println!("{tree1} is {}equal to {tree2}", if dag1 == dag2 {""} else {"not "});
+                        println!("dag pov  : {tree1} is {}equal to {tree2}", if dag1 == dag2 {""} else {"not "});
+                        tree1.to_canonical();
+                        tree2.to_canonical();
+                        println!("canonical: {tree1} is {}equal to {tree2}", if tree1 == tree2 {""} else {"not "});
                     } else {
                         dag1.remove_multiedges();
                         dag2.remove_multiedges();

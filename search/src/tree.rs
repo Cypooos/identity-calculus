@@ -111,9 +111,16 @@ impl Tree {
         self.children.iter_mut().for_each(|x|x.to_canonical());
         self.children.sort();
     }
-    // ( () (()) )      A AI AAII I 
+    // ( () (()) )
+    // () ,  (())
+    // (()), ()
 
 }
+
+// l1 = ((I ((I I) I)) ((I ((I I) I)) I))
+//      
+// l2 = ((I ((I I) I)) (((I I) (I I)) I))
+//      
 
 
 impl fmt::Display for Tree {

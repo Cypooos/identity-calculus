@@ -9,6 +9,7 @@ pub mod reduction;
 pub mod tree;
 pub mod reconstruct;
 pub mod enumerate;
+pub mod search;
 
 pub use dag::{MultiDag, NodeId};
 pub use parse::TreeParseError;

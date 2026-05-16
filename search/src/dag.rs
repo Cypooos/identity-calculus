@@ -117,6 +117,11 @@ impl<T> MultiDag<T> {
         self.edges.iter().fold(0, |acc,(_,v)| acc+ v.iter().unique().collect::<Vec<&NodeId>>().len())
     }
 
+    pub fn height(&self) -> usize {
+        // TODO
+        return 4;
+    }
+
     /// Childs of a vertex, vec of (child, multiplicity)
     pub fn children(&self, from: NodeId) -> Vec<(NodeId, usize)> {
         self.edges
@@ -264,21 +269,49 @@ impl PartialEq for MultiDag<Tree> {
             let res = if left.label == right.label {
                 true
             } else {
-                let left_children = me.edges.get(&node1).unwrap();
-                let right_children = other.edges.get(&node2).unwrap();
+                
+                let left_children: Vec<(usize, Vec<NodeId>)> =
+                    me.children(node1)
+                        .into_iter()
+                        .sorted_by_key(|&(_, ar)| ar)
+                        .chunk_by(|&(_, ar)| ar)
+                        .into_iter()
+                        .map(|(ar, group)| {
+                            let nodes = group.map(|(node, _)| node).collect();
+                            (ar, nodes)
+                        })
+                        .collect();
 
-                if left_children.len() != right_children.len() {
+                let right_children: Vec<(usize, Vec<NodeId>)> =
+                    other.children(node2)
+                        .into_iter()
+                        .sorted_by_key(|&(_, ar)| ar)
+                        .chunk_by(|&(_, ar)| ar)
+                        .into_iter()
+                        .map(|(ar, group)| {
+                            let nodes = group.map(|(node, _)| node).collect();
+                            (ar, nodes)
+                        })
+                        .collect();
+
+                        
+                if left_children.len() != right_children.len() || left_children.iter().zip(&right_children).any(|((ar1,v1),(ar2,v2))| *ar1 != *ar2 || v1.len() != v2.len()) {
                     false
                 } else {
-                    right_children
+                    left_children
                         .iter()
-                        .permutations(right_children.len())
-                        .any(|perm| {
-                            left_children
-                                .iter()
-                                .zip(perm)
-                                .all(|(x, y)| check_rec(me, *x, other, *y))
-                        })
+                        .zip(right_children)
+                        .all(|((_,left),(_,right))|
+                            left
+                            .iter()
+                            .permutations(left.len())
+                            .any(|perm| {
+                                right
+                                    .iter()
+                                    .zip(perm)
+                                    .all(|(x, y)| check_rec(me, *x, other, *y))
+                            })
+                        )
                 }
             };
             eq_memo().lock().unwrap().insert(key, res);
@@ -324,4 +357,34 @@ mod test {
         let d2 = MultiDag::from_tree(&parse_tree("((())())").unwrap());
         assert_ne!(d1,d2);
     }
+    
+    #[test]
+    fn counter_example() {
+        let d1 = MultiDag::from_tree(&parse_tree("( (()(())) (()(())) )").unwrap());
+        let d2 = MultiDag::from_tree(&parse_tree("( (()(())) ((())()) )").unwrap());
+
+
+        assert_ne!(d1,d2);
+    }
+    
+    #[test]
+    fn gpt_example() {
+        let d1 = MultiDag::from_tree(&parse_tree("(   ( ( ()(()) ) () )  ( (()(())) () )   )").unwrap());
+        let d2 = MultiDag::from_tree(&parse_tree("(   ( ( ()(()) ) () )  ( ((())()) () )   )").unwrap());
+
+        assert_ne!(d1,d2);
+    }
 }
+
+/*
+
+I
+\x.x
+
+N
+( (I ( (I I) I))  (I I))
+
+M
+( ((I I) (I I))  (I I))
+
+*/

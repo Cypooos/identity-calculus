@@ -5,6 +5,8 @@ use crate::immediate_reductions;
 use crate::parse::parse_tree;
 use crate::tree::Tree;
 
+use rand::{Rng, RngExt};
+
 pub fn catalan(n: usize) -> u128 {
     let mut c: u128 = 1; // C_0 = 1
 
@@ -49,6 +51,28 @@ fn get_dyck_words(pairs: usize) -> Vec<String> {
 pub fn get_trees(edge_count: usize) -> Vec<Tree> {
         let inner = get_dyck_words(edge_count);
         inner.into_iter().map(|w| format!("({w})")).map(|s|parse_tree(&s).unwrap()).collect()
+}
+
+/// Give a random generated tree with edge_count edges
+pub fn get_random_tree<R: Rng + ?Sized>(rng: &mut R, edge_count: usize) -> Tree {
+    let mut children: Vec<Vec<usize>> = vec![Vec::new()];
+
+    for new_node in 1..=edge_count {
+        let parent = rng.random_range(0..new_node);
+        children.push(Vec::new());
+        children[parent].push(new_node);
+    }
+
+    fn build(node: usize, children: &[Vec<usize>]) -> Tree {
+        Tree {
+            children: children[node]
+                .iter()
+                .map(|&child| build(child, children))
+                .collect(),
+        }
+    }
+
+    build(0, &children)
 }
 
 /// Get number of reduction from tree to I, with or without multiplicity

@@ -7,6 +7,7 @@ use search::dag::MultiDag;
 use search::dot::to_dot;
 use search::enumerate::{catalan, get_hook_length, get_nb_reductions, get_random_tree, get_trees};
 use search::parse::parse_tree;
+use search::search::{are_dyslexic, find_dyslexic_dag_conjecture_counterexample};
 use search::tree::Tree;
 
 use search::reconstruct::{get_spine, reconstruct};
@@ -72,6 +73,16 @@ enum Command {
         n:usize,
         #[arg(long)]
         multi: bool,
+    },
+
+    /// Currently, search for all pairs if trees of nodes <= nb_nodes if dag equality <=> canonical 
+    SearchDyslexic {
+        #[arg(long)]
+        nb_edges:usize,
+        #[arg(long)]
+        tries:usize,
+        #[arg(long)]
+        batch:usize,
     }
 }
 
@@ -133,6 +144,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let mut dag1 = MultiDag::<Tree>::from_tree(&tree1);
                     let mut dag2 = MultiDag::<Tree>::from_tree(&tree2);
                     if multi {
+                        println!("dyslexic : {tree1} is {}dyslexic to {tree2}", if are_dyslexic(&tree1, &tree2) {""} else {"not "});
                         println!("dag pov  : {tree1} is {}equal to {tree2}", if dag1 == dag2 {""} else {"not "});
                         tree1.to_canonical();
                         tree2.to_canonical();
@@ -171,6 +183,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 });
             });
             println!("DONE ({i}/{nb}).")
+        }
+        Command::SearchDyslexic { nb_edges, tries, batch } => {
+            for i in 1..=batch {
+                print!("bach {i}/{batch}...");
+                let mut rng = rand::rng();
+                // This test is only here to exercise the code path (and ensure it doesn't panic).
+                if let Some((t1,t2)) = find_dyslexic_dag_conjecture_counterexample(&mut rng, nb_edges, tries) {
+                    println!("\nFOUND TWO COUNTER-EXAMPLES:\n{t1} AND {t2}");
+                    return Ok(());
+                }
+                println!("No counter examples found.")
+
+            }
         }
     }
 

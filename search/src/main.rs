@@ -28,7 +28,7 @@ enum Command {
         #[arg(long)]
         tree: String,
 
-        /// Conserve/affiche les labels d'arbres (utile pour DOT).
+        /// Affiche avec des I si true
         #[arg(long)]
         labels: bool,
 
@@ -92,7 +92,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     match cli.command {
         Command::Dag {
             tree,
-            labels:_,
+            labels,
             dot,
             multi,
             spine,
@@ -118,6 +118,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 } else if spine {
                     let spine = get_spine(&dag);
                     to_dot(&dag.tag_vec(&spine), multi)
+                } else if labels {
+                    let dag2 = dag.map(|l,_|l.to_i());
+                    to_dot(&dag2,multi)
                 } else {
                     to_dot(&dag,multi)
                 };

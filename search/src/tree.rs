@@ -115,6 +115,11 @@ impl Tree {
     // () ,  (())
     // (()), ()
 
+    //
+    pub fn to_i(&self) -> String {
+        return self.children.iter().rev().fold(format!("I"), |s,c|format!("({} {s})", c.to_i()))
+    }
+
 }
 
 // l1 = ((I ((I I) I)) ((I ((I I) I)) I))

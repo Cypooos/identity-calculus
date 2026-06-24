@@ -17,6 +17,10 @@ impl DotLabel for bool {
     fn get_meta(&self) -> String { if *self {format!("color=red")} else {format!("")} }
 }
 
+impl DotLabel for String {
+    fn get_text(&self) -> String { self.clone() }
+}
+
 impl<T,U> DotLabel for (T, U) where T:DotLabel, U:DotLabel {
     fn get_text(&self) -> String { self.0.get_text() }
     fn get_meta(&self) -> String { self.1.get_meta() }

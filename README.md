@@ -2,12 +2,12 @@
 
 This repository contains my notes and experimental code for studying the reduction graphs of identity lambda-terms, for the internship at IRIF I did with Giulio Manzonetto.
 The main idea is to translate identity terms into ordered rooted trees, where beta-reduction corresponds to removing leaves. This gives a simple combinatorial model for reduction DAGs, multiplicities of reductions, and equivalences between terms with the same reduction graph.
-See the report in typst/
+The source typst code of my report (originally made here then moved a few time) is available in the `typst/` folder
 
 ## Contents
 
-* `typst/`: Typst notes and report sources.
-* `search/`: Rust code for generating and comparing reduction DAGs of ordered rooted trees.
+* `typst/`: Typst notes and report sources
+* `search/`: Rust code for generating and comparing reduction DAGs of ordered rooted trees
 
 ## Rust tool
 
